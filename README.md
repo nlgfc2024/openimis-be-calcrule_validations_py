@@ -100,3 +100,27 @@ It's expected to return a `ValidationResult` as a dictionary structured as follo
     ))
 ```
 * The signature of `validate` method is `def validate(cls, field_name, field_value, **kwargs)`
+## Parameterised strategies
+
+These strategies take their parameters as keyword arguments of `validate`, so the caller decides the rule.
+A missing parameter fails validation with a note naming it; a blank value fails with `No value`. The
+individual and beneficiary upload workflows call strategies with `field_name` and `field_value` only, so
+use these from code that passes the parameters, such as the `appraisal` module.
+
+| Strategy | Parameters | Succeeds when |
+| --- | --- | --- |
+| `ValueInListValidationStrategy` | `values` | the value, as text, is one of `values` (case-sensitive, surrounding spaces ignored) |
+| `NumberRangeValidationStrategy` | `min`, `max` (either may be left out) | the value is a number from `min` to `max`, inclusive; numeric text such as `"3,500,000"` is read |
+| `AgeRangeValidationStrategy` | `min`, `max`, `reference_date` (default today) | the value is a date of birth and the completed years on `reference_date` are from `min` to `max`, inclusive |
+| `DateAfterValidationStrategy` | `reference_date` (default today) | the value is a date on or after `reference_date`, e.g. an expiry date that hasn't passed |
+| `RegexValidationStrategy` | `pattern` | the whole value, as text, matches `pattern` |
+
+Dates are read from `date`, `datetime` or ISO text (`2026-11-23`, `2026-11-23T08:30:00Z`).
+
+```python
+from calcrule_validations.strategies import ValidationStrategyStorage
+
+strategy = ValidationStrategyStorage.choose_strategy("AgeRangeValidationStrategy")
+strategy.validate("dob", "1995-04-02", min=18, max=35, reference_date="2026-11-23")
+# {'success': True, 'field_name': 'dob', 'note': 'Aged 31 on 2026-11-23', 'duplications': None}
+```
