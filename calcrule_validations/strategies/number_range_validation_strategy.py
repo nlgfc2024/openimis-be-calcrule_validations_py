@@ -1,5 +1,5 @@
 from calcrule_validations.strategies.base_strategy import BaseValidationsStrategy
-from calcrule_validations.strategies.parameter_helpers import is_blank, result, to_number
+from calcrule_validations.strategies.parameter_helpers import is_blank, number_parameter, result, to_number
 
 
 class NumberRangeValidationStrategy(BaseValidationsStrategy):
@@ -8,7 +8,9 @@ class NumberRangeValidationStrategy(BaseValidationsStrategy):
 
     @classmethod
     def validate(cls, field_name, field_value, **kwargs):
-        minimum, maximum = kwargs.get("min"), kwargs.get("max")
+        (minimum, min_error), (maximum, max_error) = number_parameter(kwargs, "min"), number_parameter(kwargs, "max")
+        if min_error or max_error:
+            return result(field_name, False, min_error or max_error)
         if minimum is None and maximum is None:
             return result(field_name, False, "No min or max configured")
         if is_blank(field_value):

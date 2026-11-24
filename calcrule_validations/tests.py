@@ -51,6 +51,21 @@ class NumberRangeTest(SimpleTestCase):
         self.assertTrue(check("NumberRangeValidationStrategy", 10 ** 9, min=3000000)[0])
         self.assertEqual(check("NumberRangeValidationStrategy", 1), (False, "No min or max configured"))
 
+    def test_non_finite_values_fail(self):
+        for value in ("nan", "NaN", "inf", "-inf", float("inf"), "1e999"):
+            with self.subTest(value=value):
+                self.assertEqual(check("NumberRangeValidationStrategy", value, min=3000000),
+                                 (False, f"'{value}' is not a number"))
+        # A float NaN is an empty cell in a pandas-read upload
+        self.assertEqual(check("NumberRangeValidationStrategy", float("nan"), min=3000000), (False, "No value"))
+
+    def test_a_bound_that_is_not_a_number_fails_with_a_note(self):
+        for params in ({"min": "18"}, {"max": True}, {"min": 1, "max": float("nan")}):
+            with self.subTest(params=params):
+                success, note = check("NumberRangeValidationStrategy", 20, **params)
+                self.assertFalse(success)
+                self.assertIn("is not a number", note)
+
 
 class AgeRangeTest(SimpleTestCase):
     def test_completed_years_on_the_reference_date(self):
@@ -67,6 +82,8 @@ class AgeRangeTest(SimpleTestCase):
         self.assertEqual(check("AgeRangeValidationStrategy", "2030-01-01", min=18, reference_date=ON)[1],
                          "Date of birth 2030-01-01 is after 2026-11-23")
         self.assertEqual(check("AgeRangeValidationStrategy", "soon", min=18), (False, "'soon' is not a date"))
+        self.assertEqual(check("AgeRangeValidationStrategy", "2000-01-01", min="18"),
+                         (False, "Configured min '18' is not a number"))
 
 
 class DateAfterTest(SimpleTestCase):
@@ -98,4 +115,6 @@ class ToDateTest(SimpleTestCase):
                       date(2026, 11, 23), datetime(2026, 11, 23, 8)):
             with self.subTest(value=value):
                 self.assertEqual(to_date(value), date(2026, 11, 23))
-        self.assertIsNone(to_date("23/11/2026"))
+        for value in ("23/11/2026", "2026-11-23garbage", "2026-11-23 and more", "2026-02-30", "2026-11-23T"):
+            with self.subTest(value=value):
+                self.assertIsNone(to_date(value))
